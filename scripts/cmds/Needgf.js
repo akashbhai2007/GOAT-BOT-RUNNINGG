@@ -1,77 +1,68 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
+const https = require("https");
+
+function decode(b64) {
+  return Buffer.from(b64, "base64").toString("utf-8");
+}
+
+async function downloadImage(url, filePath) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(filePath);
+    https.get(url, res => {
+      if (res.statusCode !== 200)
+        return reject(new Error(`Image fetch failed with status: ${res.statusCode}`));
+      res.pipe(file);
+      file.on("finish", () => file.close(resolve));
+    }).on("error", err => {
+      fs.unlink(filePath, () => reject(err));
+    });
+  });
+}
+
+const encodedUrl = "aHR0cHM6Ly9yYXNpbi1hcGlzLm9ucmVuZGVyLmNvbQ==";
+const encodedKey = "cnNfaGVpNTJjbTgtbzRvai11Y2ZjLTR2N2MtZzE=";
 
 module.exports = {
   config: {
     name: "needgf",
-    version: "3.0.0",
+    version: "3.0.1",
     author: "MOHAMMAD AKASH",
-    countDown: 5,
+    countDown: 10,
     role: 0,
     shortDescription: "তোর Gf এর প্রোফাইল পিক দেখায় 😍",
-    longDescription: "প্রতি বার কমান্ড দিলে র‍্যান্ডম এক Facebook আইডির প্রোফাইল পিক পাঠায় 😘",
-    category: "fun"
+    longDescription: "সিঙ্গেলদের জন্য বিশেষ কমান্ড 💔 প্রতি বার নতুন সুন্দরী মেয়ের প্রোফাইল 😚",
+    category: "fun",
   },
 
-  onStart: async function ({ api, event }) {
+  onStart: async function ({ message, event }) {
     try {
-      const gfLinks = [
-        "https://www.facebook.com/Tahiya.islam.Mim.172981",
-        "https://www.facebook.com/profile.php?id=61579313473560",
-        "https://www.facebook.com/profile.php?id=61579200578210",
-        "https://www.facebook.com/profile.php?id=100080828841579",
-        "https://www.facebook.com/ntojkuangpremikayi.2025",
-        "https://www.facebook.com/profile.php?id=61581525114036",
-        "https://www.facebook.com/profile.php?id=61580075994194",
-        "https://www.facebook.com/profile.php?id=61581179957989",
-        "https://www.facebook.com/labanno.akther.507",
-        "https://www.facebook.com/profile.php?id=61582203020368",
-        "https://www.facebook.com/profile.php?id=61577263375927",
-        "https://www.facebook.com/profile.php?id=61576316681115",
-        "https://www.facebook.com/profile.php?id=61580087063928",
-        "https://www.facebook.com/profile.php?id=61580737480343",
-        "https://www.facebook.com/profile.php?id=61581072464419",
-        "https://www.facebook.com/profile.php?id=61581253517272"
-      ];
+      const apiUrl = decode(encodedUrl);
+      const apiKey = decode(encodedKey);
+      const fullUrl = `${apiUrl}/api/rasin/gf?apikey=${apiKey}`;
 
-      // 🎯 Random লিংক বাছাই
-      const randomLink = gfLinks[Math.floor(Math.random() * gfLinks.length)];
+      const res = await axios.get(fullUrl);
+      const imgUrl = res.data?.data?.url;
 
-      // 📎 আইডি এক্সট্রাক্ট করা
-      let fbID = null;
-      const idMatch = randomLink.match(/id=(\d+)/);
-      if (idMatch) {
-        fbID = idMatch[1];
-      } else {
-        const usernameMatch = randomLink.match(/facebook\.com\/([^/?]+)/);
-        fbID = usernameMatch ? usernameMatch[1] : null;
-      }
+      if (!imgUrl)
+        return message.reply("⚠️ ছবি পাওয়া যায়নি ভাই 😭 আবার চেষ্টা করো!");
 
-      if (!fbID) return api.sendMessage("😅 প্রোফাইল লিংক ঠিক নেই!", event.threadID, event.messageID);
+      const imgPath = path.join(__dirname, "tmp", `${event.senderID}_gf.jpg`);
+      await downloadImage(imgUrl, imgPath);
 
-      // 🔗 প্রোফাইল পিক আনা
-      const res = await axios.get(`https://graph.facebook.com/${fbID}/picture?width=800&height=800&redirect=false`);
-      const imgURL = res.data.data.url;
+      const replyMsg = `🌸✨ আপনার ভাগ্য জেগেছে ভাই!\nএমন সুন্দরী গফ সবাই পায় না 💕\n👇 নিচে দেখুন আপনার গফের প্রোফাইল 😚`;
 
-      const cacheDir = path.join(__dirname, "cache");
-      fs.ensureDirSync(cacheDir);
-      const filePath = path.join(cacheDir, `gf_${fbID}.jpg`);
+      await message.reply({
+        body: replyMsg,
+        attachment: fs.createReadStream(imgPath)
+      });
 
-      const img = await axios.get(imgURL, { responseType: "arraybuffer" });
-      fs.writeFileSync(filePath, Buffer.from(img.data, "binary"));
+      fs.unlinkSync(imgPath);
 
-      // 💬 মেসেজ পাঠানো
-      const message = {
-        body: `🎉এই নে লুচ্চা তোর Gf 😚\nএখন আমারে এখন আমারে ট্রিট দে 🐱\n${randomLink}`,
-        attachment: fs.createReadStream(filePath)
-      };
-
-      api.sendMessage(message, event.threadID, () => fs.unlinkSync(filePath), event.messageID);
-
-    } catch (error) {
-      console.error("❌ Error:", error);
-      api.sendMessage("কিছু একটা সমস্যা হইছে ভাই 😅", event.threadID, event.messageID);
+    } catch (err) {
+      console.error("❌ Error:", err.message);
+      message.reply("⚠️ কিছু একটা গন্ডগোল হইছে ভাই 😭 পরে আবার চেষ্টা করো!");
     }
   }
 };
