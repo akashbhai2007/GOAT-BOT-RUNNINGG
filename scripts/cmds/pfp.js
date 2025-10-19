@@ -5,7 +5,7 @@ const path = require("path");
 
 module.exports = {
   config: {
-    name: "pfp",
+    name: "pp",
     version: "1.0",
     author: "nexo_here", // Replace with your name
     countDown: 5, // A short cooldown to prevent spamming
