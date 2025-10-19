@@ -5,64 +5,56 @@ const path = require("path");
 module.exports = {
   config: {
     name: "text_voice",
-    version: "1.1.0",
-    author: "Mohammad Akash",
-    countDown: 5,
+    version: "1.2.0",
+    author: "MOHAMMAD AKASH",
+    countDown: 3,
     role: 0,
     shortDescription: "নির্দিষ্ট টেক্সটে কিউট মেয়ের ভয়েস প্লে করে 😍",
-    longDescription: "যখন কেউ নির্দিষ্ট টেক্সট লিখবে, তখন বট সেই টেক্সট অনুযায়ী ভয়েস পাঠাবে। (ইমোজি ছাড়া)",
+    longDescription: "যখন কেউ নির্দিষ্ট টেক্সট বা তার কাছাকাছি কিছু লিখবে, তখন বট সেই অনুযায়ী ভয়েস পাঠাবে। (ইমোজি বা অতিরিক্ত শব্দ থাকলেও চিনবে)",
     category: "noprefix"
   },
 
   onChat: async function ({ api, event }) {
-    const { threadID, messageID, body } = event;
-    if (!body) return;
-
-    const msg = body.trim().toLowerCase();
-
-    // 🎧 নির্দিষ্ট টেক্সট অনুযায়ী ভয়েস URL (partial match system)
-    const textAudioMap = [
-      { key: "i love you", url: "https://files.catbox.moe/npy7kl.mp3" },
-      { key: "mata beta", url: "https://files.catbox.moe/5rdtc6.mp3" },
-    ];
-
-    // যেকোনো key যদি মেসেজের মধ্যে থাকে
-    const match = textAudioMap.find(item => msg.includes(item.key));
-    if (!match) return;
-
-    const cacheDir = path.join(__dirname, "cache");
-    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
-
-    const filePath = path.join(cacheDir, `${encodeURIComponent(match.key)}.mp3`);
-
     try {
-      const response = await axios({
-        method: "GET",
-        url: match.url,
-        responseType: "stream"
-      });
+      const { threadID, messageID, body } = event;
+      if (!body) return;
 
-      const writer = fs.createWriteStream(filePath);
-      response.data.pipe(writer);
+      // ছোট হরফে কনভার্ট ও ইমোজি-স্পেশাল ক্যারেক্টার বাদ দাও
+      const msg = body.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").trim();
 
-      writer.on("finish", () => {
-        api.sendMessage({
+      // 🎧 ভয়েস লিস্ট (কীওয়ার্ড অনুযায়ী)
+      const textAudioMap = [
+        { key: /i\s*love\s*you/, url: "https://files.catbox.moe/npy7kl.mp3" },
+        { key: /mata\s*beta/, url: "https://files.catbox.moe/5rdtc6.mp3" },
+      ];
+
+      // যদি কোনো regex match করে
+      const match = textAudioMap.find(item => item.key.test(msg));
+      if (!match) return;
+
+      const cacheDir = path.join(__dirname, "cache");
+      await fs.ensureDir(cacheDir);
+
+      const filePath = path.join(cacheDir, `${Date.now()}.mp3`);
+
+      // ভয়েস ডাউনলোড
+      const response = await axios.get(match.url, { responseType: "arraybuffer" });
+      await fs.writeFile(filePath, response.data);
+
+      // ভয়েস পাঠানো
+      await api.sendMessage(
+        {
+          body: "🎧 কিউট ভয়েস আসছে 😍",
           attachment: fs.createReadStream(filePath)
-        }, threadID, () => {
-          fs.unlink(filePath, err => {
-            if (err) console.error("Error deleting file:", err);
-          });
-        }, messageID);
-      });
+        },
+        threadID,
+        () => fs.unlink(filePath, () => {}),
+        messageID
+      );
 
-      writer.on("error", err => {
-        console.error("Error writing file:", err);
-        api.sendMessage("ভয়েস প্লে হয়নি 😅", threadID, messageID);
-      });
-
-    } catch (error) {
-      console.error("Error downloading audio:", error);
-      api.sendMessage("ভয়েস প্লে হয়নি 😅", threadID, messageID);
+    } catch (err) {
+      console.error(err);
+      api.sendMessage("⚠️ ভয়েস পাঠানো যায়নি ভাই 😅", event.threadID, event.messageID);
     }
   }
 };
