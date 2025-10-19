@@ -5,56 +5,40 @@ const axios = require("axios");
 module.exports = {
   config: {
     name: "needgf",
-    version: "1.0.0",
+    version: "1.0.2",
     author: "MOHAMMAD AKASH",
-    countDown: 10,
+    countDown: 5,
     role: 0,
-    shortDescription: "র‍্যান্ডম গফ আইডি দেয় ❤️",
-    longDescription: "সিঙ্গেলদের জন্য র‍্যান্ডম গফ লিংক সহ প্রোফাইল ছবি পাঠায় 😭",
+    shortDescription: "র‌্যান্ডম গার্লফ্রেন্ড আইডি পাঠায়",
+    longDescription: "gfdata.json ফাইল থেকে র‌্যান্ডম গার্লফ্রেন্ড আইডি ও প্রোফাইল ছবি পাঠায়",
     category: "fun",
-    guide: "{pn}"
+    guide: "{p}needgf"
   },
 
-  onStart: async function ({ message, event }) {
+  onStart: async function({ api, event }) {
     try {
-      // JSON ফাইল থেকে লিংক পড়া
-      const dataPath = path.join(__dirname, "gfdata.json");
-      const rawData = fs.readFileSync(dataPath);
-      const jsonData = JSON.parse(rawData);
-      const links = jsonData.links;
+      const filePath = path.join(__dirname, "gfdata.json");
+      const raw = fs.readFileSync(filePath);
+      const data = JSON.parse(raw);
 
-      if (!Array.isArray(links) || links.length === 0)
-        return message.reply("⚠️ কোনো লিংক পাওয়া যায়নি `gfdata.json` এ!");
+      if (!data.links || data.links.length === 0)
+        return api.sendMessage("⚠️ JSON ফাইলে কোনো লিংক নাই ভাই 😭", event.threadID, event.messageID);
 
-      // র‍্যান্ডম লিংক নির্বাচন
-      const randomLink = links[Math.floor(Math.random() * links.length)];
+      const randomLink = data.links[Math.floor(Math.random() * data.links.length)];
 
-      // প্রোফাইল আইডি/ইউজারনেম বের করা
-      const idMatch = randomLink.match(/id=(\d+)/);
-      const usernameMatch = randomLink.match(/facebook\.com\/([^/?]+)/);
-      const userId = idMatch ? idMatch[1] : usernameMatch ? usernameMatch[1] : null;
+      // Facebook প্রোফাইল পিকচার বের করা (public API)
+      const profilePic = `${randomLink}?type=large`;
 
-      if (!userId)
-        return message.reply("⚠️ প্রোফাইল আইডি পাওয়া যায়নি!");
+      const msg = {
+        body: `😍 আপনার নতুন গফ পাওয়া গেছে ভাই 😚\n\n👉 ${randomLink}`,
+        attachment: await global.utils.getStreamFromURL(profilePic)
+      };
 
-      // প্রোফাইল পিকচার ডাউনলোড
-      const imgUrl = `https://graph.facebook.com/${userId}/picture?width=720&height=720`;
-      const imgPath = path.join(__dirname, "cache", `${event.senderID}_gf.jpg`);
-      const response = await axios.get(imgUrl, { responseType: "arraybuffer" });
-      fs.writeFileSync(imgPath, Buffer.from(response.data, "binary"));
-
-      // পাঠানো
-      await message.reply({
-        body: `এই নে বলদ তোরে গফ দিলাম 😤\n${randomLink}`,
-        attachment: fs.createReadStream(imgPath)
-      });
-
-      // মেমরি ক্লিন
-      fs.unlinkSync(imgPath);
+      return api.sendMessage(msg, event.threadID, event.messageID);
 
     } catch (err) {
       console.error(err);
-      message.reply("⚠️ কিছু একটা গন্ডগোল হইছে ভাই 😭");
+      return api.sendMessage("⚠️ কিছু একটা গন্ডগোল হইছে ভাই 😭", event.threadID, event.messageID);
     }
   }
 };
