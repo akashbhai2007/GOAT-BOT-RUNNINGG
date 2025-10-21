@@ -1,12 +1,12 @@
 const { loadImage, createCanvas } = require("canvas");
 const fs = require("fs-extra"); // fs-extra ব্যবহার করা হবে, কারণ এটি fs এর চেয়ে বেশি কার্যকরী
 const axios = require("axios");
-const path = require("path"); // path মডিউল যোগ করা হয়েছে ফাইল পাথ তৈরির জন্য
+const path = require("path"); 
 
 module.exports = {
   config: {
     name: "wanted",
-    aliases: ["wtd"], // আপনি চাইলে অন্য অ্যালিয়াস যোগ করতে পারেন
+    aliases: ["wtd"], 
     version: "1.2.0",
     author: "Rx Abdullah Convert To Goat bot v2 by Akash",
     countdown: 5, // কুলডাউন সেকেন্ডে
